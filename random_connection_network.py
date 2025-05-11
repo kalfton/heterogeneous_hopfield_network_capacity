@@ -1,23 +1,8 @@
 import numpy as np
-from numpy import random
 import torch
 from torch import nn
-from torch.nn import functional as F
-from matplotlib import pyplot as plt
-import scipy
-# from scipy.linalg import sqrtm
-from torch import optim
-from torch.optim.lr_scheduler import ExponentialLR
 import utils_basic as utils
-import math
-from sklearn import svm
-import sklearn
-
-
-act_state = 1-1e-5
-inact_state = -1+1e-5 # when the state_g is equal to 0 or 1, state_x will go to infinity
-# training_max_iter = 100000
-
+""" Author: Kaining Zhang, 05/04/2025 """
 
 
 class random_connect_network(nn.Module):
@@ -25,8 +10,6 @@ class random_connect_network(nn.Module):
     min_error = 2e-8
 
     def __init__(self, n_neuron, dt=0.01, network_type=None, connection_prop = None, W_symmetric=True, weight_std_init=None, mask=None, neuron_base_state = -1):
-        # layer 1 is the feature layer, which receive and store the input.
-        # layer 2 is the index layer.
         super().__init__()
         self.n_neuron = n_neuron
         self.dt = dt
@@ -153,17 +136,8 @@ class random_connect_network(nn.Module):
                 weights,b = utils.svm_by_sklearn(inputs.numpy(), labels.numpy(),regularization = regularization.numpy())
                 self.weight.data[i,self.mask[i,:] == 1] = torch.from_numpy(weights).float()
                 self.b.data[i] = b
-                # clf.fit(inputs, labels)
-                # self.weight.data[i,self.mask[i,:] == 1] = torch.from_numpy(clf.coef_[0]).float()
-                # self.b.data[i] = torch.from_numpy(clf.intercept_).float()
-            # else:
-            #     print("Neuron i is not connected to any other neurons, and the labels are not all 1 or all 0.")
-
 
         stored_patterns = self.forward(patterns, n_step = 1, dt_train = 1)
-        # network_accuracy = utils.network_score(self.weight.detach(), self.b.detach(), patterns, kappa = kappa)
-
-
 
         # Get the most acurate patterns that is stored in the network:
         if self.lossfun(stored_patterns, patterns)>self.min_error*2:

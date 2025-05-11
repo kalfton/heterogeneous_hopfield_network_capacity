@@ -1,24 +1,11 @@
 import numpy as np
-from numpy import random
 import torch
 from torch import nn
-from torch.nn import functional as F
 from matplotlib import pyplot as plt
-import scipy
-# from scipy.linalg import sqrtm
-from torch import optim
-from torch.optim.lr_scheduler import ExponentialLR
 import utils_basic as utils
 import math
-from sklearn import svm
-import sklearn
-import matplotlib
-import time
+""" Author: Kaining Zhang, 05/04/2025 """
 
-
-act_state = 1-1e-5
-inact_state = -1+1e-5 # when the state_g is equal to 0 or 1, state_x will go to infinity
-# training_max_iter = 100000
 
 class committee_machine(nn.Module):
     """A three layer neural network with a tree-like structure,
@@ -114,14 +101,10 @@ class committee_machine(nn.Module):
         tensor_list: list of 1D torch.Tensors of varying lengths
         return: 2D torch.Tensor [num_tensors, max_length]
         """
-        # 1) Find the maximum length among all tensors.
         max_len = max(t.size(0) for t in tensor_list)
-        
-        # 2) Initialize a 2D tensor of zeros.
         padded = torch.zeros((len(tensor_list), max_len), dtype=tensor_list[0].dtype)
         
-        # 3) Copy each tensor into the rows of 'padded' 
-        #    (fill the remainder with zeros).
+        # Copy each tensor into the rows of 'padded' (fill the remainder with zeros).
         for i, t in enumerate(tensor_list):
             padded[i, :t.size(0)] = t
         
@@ -182,81 +165,64 @@ class committee_machine(nn.Module):
         # print('Loss = {}'.format(loss.item()))
         self.align_weights()
 
-        # # for debugging: calculate the error rate using forward_discrete
-        # output_all_temp = torch.zeros(len(inputs))
-        # for i in range(len(inputs)):
-        #     output_all_temp[i], _, _ = self.forward_discrete(inputs[i])
-        # error_rate = torch.mean((output_all_temp*labels<=0).float()).item()
-        # print('Error rate = {}'.format(error_rate))
-
         return False, errors_for_return, epochs_for_return
     
 
-    def train_ALA(self, inputs, labels, learning_rate=0.1, max_epochs=10000):
-        """Train the network with given inputs and labels useing ALA learning.
-        input should be a list of list of input vectors, each of which is a 1D tensor.
-        label should be a one dim array""" 
-        # ALA only works for no bias case
-        self.add_bias = False
-        self.hidden_biases = torch.zeros(self.hidden_size, requires_grad=False)
-        torch.set_grad_enabled(False)
-        n_pattern = len(inputs)
-        errors_for_return = []
-        epochs_for_return = []
+    # def train_ALA(self, inputs, labels, learning_rate=0.1, max_epochs=10000):
+    #     """Train the network with given inputs and labels useing ALA learning.
+    #     input should be a list of list of input vectors, each of which is a 1D tensor.
+    #     label should be a one dim array""" 
+    #     # ALA only works for no bias case
+    #     self.add_bias = False
+    #     self.hidden_biases = torch.zeros(self.hidden_size, requires_grad=False)
+    #     torch.set_grad_enabled(False)
+    #     n_pattern = len(inputs)
+    #     errors_for_return = []
+    #     epochs_for_return = []
 
-        inputs_tensor = []
-        for i in range(n_pattern):
-            inputs_tensor.append(self.pad_list_of_tensors(inputs[i]))
-        input_tensor = torch.stack(inputs_tensor, dim=0)
-        input_to_hidden_tensor = self.pad_list_of_tensors(self.input_to_hidden)
+    #     inputs_tensor = []
+    #     for i in range(n_pattern):
+    #         inputs_tensor.append(self.pad_list_of_tensors(inputs[i]))
+    #     input_tensor = torch.stack(inputs_tensor, dim=0)
+    #     input_to_hidden_tensor = self.pad_list_of_tensors(self.input_to_hidden)
 
-        for epoch in range(max_epochs):
-            output_fields_correction = torch.zeros(n_pattern)
-            output_all = torch.zeros(n_pattern)
+    #     for epoch in range(max_epochs):
+    #         output_fields_correction = torch.zeros(n_pattern)
+    #         output_all = torch.zeros(n_pattern)
 
-            output_all, out_put_field_all, hidden_fields_all = self.forward_discrete_tensor_version(input_to_hidden_tensor, input_tensor)
-            output_fields_correction = out_put_field_all*labels
-            # for i in range(n_pattern):
-            #     outputs, output_field, hidden_fields = self.forward_discrete_tensor_version(input_to_hidden_tensor, inputs_tensor[i])
-            #     output_fields_correction[i] = output_field*labels[i]
-            #     output_all[i] = outputs
+    #         output_all, out_put_field_all, hidden_fields_all = self.forward_discrete_tensor_version(input_to_hidden_tensor, input_tensor)
+    #         output_fields_correction = out_put_field_all*labels
+
             
-            if epoch%10==0:
-                # calculate the error and save it
-                errors_for_return.append(torch.mean((output_all*labels<=0).float()).item())
-                epochs_for_return.append(epoch)
+    #         if epoch%10==0:
+    #             # calculate the error and save it
+    #             errors_for_return.append(torch.mean((output_all*labels<=0).float()).item())
+    #             epochs_for_return.append(epoch)
 
-            # find the pattern that has the most negative output field 
-            if torch.all(output_fields_correction>0):
-                # unpad the tensor
-                self.input_to_hidden_tensor = nn.Parameter(input_to_hidden_tensor, requires_grad=True)
-                self.align_weights()
-                torch.set_grad_enabled(True)
-                return True, errors_for_return, epochs_for_return
-            idx = torch.argmin(output_fields_correction)
-            # find the hidden unit that is the easiest to change to correct the output
-            hidden_fields = (self.forward_discrete_tensor_version(input_to_hidden_tensor, inputs_tensor[idx].unsqueeze(0))[2])[0]
-            hidden_fields_correction = hidden_fields*labels[idx]
-            hidden_fields_correction_neg = hidden_fields_correction
-            hidden_fields_correction_neg[hidden_fields_correction>0] = -float('inf')
-            idx_hidden = torch.argmax(hidden_fields_correction_neg)
-            # update the weights
-            input_to_hidden_tensor[idx_hidden] = input_to_hidden_tensor[idx_hidden] + learning_rate*inputs_tensor[idx][idx_hidden]*labels[idx] *(1-hidden_fields_correction[idx_hidden])
+    #         # find the pattern that has the most negative output field 
+    #         if torch.all(output_fields_correction>0):
+    #             # unpad the tensor
+    #             self.input_to_hidden_tensor = nn.Parameter(input_to_hidden_tensor, requires_grad=True)
+    #             self.align_weights()
+    #             torch.set_grad_enabled(True)
+    #             return True, errors_for_return, epochs_for_return
+    #         idx = torch.argmin(output_fields_correction)
+    #         # find the hidden unit that is the easiest to change to correct the output
+    #         hidden_fields = (self.forward_discrete_tensor_version(input_to_hidden_tensor, inputs_tensor[idx].unsqueeze(0))[2])[0]
+    #         hidden_fields_correction = hidden_fields*labels[idx]
+    #         hidden_fields_correction_neg = hidden_fields_correction
+    #         hidden_fields_correction_neg[hidden_fields_correction>0] = -float('inf')
+    #         idx_hidden = torch.argmax(hidden_fields_correction_neg)
+    #         # update the weights
+    #         input_to_hidden_tensor[idx_hidden] = input_to_hidden_tensor[idx_hidden] + learning_rate*inputs_tensor[idx][idx_hidden]*labels[idx] *(1-hidden_fields_correction[idx_hidden])
         
 
-        # unpad the tensor
-        self.input_to_hidden_tensor = nn.Parameter(input_to_hidden_tensor, requires_grad=True)
-        self.align_weights()
+    #     # unpad the tensor
+    #     self.input_to_hidden_tensor = nn.Parameter(input_to_hidden_tensor, requires_grad=True)
+    #     self.align_weights()
 
-        # # for debugging: calculate the error rate using forward_discrete
-        # output_all_temp = torch.zeros(len(inputs))
-        # for i in range(len(inputs)):
-        #     output_all_temp[i], _, _ = self.forward_discrete(inputs[i])
-        # error_rate = torch.mean((output_all_temp*labels<=0).float()).item()
-        # print('Error rate = {}'.format(error_rate))
-
-        torch.set_grad_enabled(True)
-        return False, errors_for_return, epochs_for_return
+    #     torch.set_grad_enabled(True)
+    #     return False, errors_for_return, epochs_for_return
 
     
 
@@ -275,9 +241,7 @@ class random_connect_network(nn.Module):
         self.add_bias = add_bias
 
         assert neuron_base_state in [0, -1] # make sure the neuron_base_state is either 0 or -1
-        # self.neuron_base_state = neuron_base_state
-        # self.act_state = 1-1e-5
-        # self.inact_state = neuron_base_state+1e-5 # when the state_g is equal to 0 or 1, state_x will go to infinity
+
 
         self.weight_std_init = weight_std_init
         
@@ -299,7 +263,6 @@ class random_connect_network(nn.Module):
         #self.weight = torch.normal(0, self.weight_std_init, (self.n_neuron, self.n_neuron)) # the synaptic weight from neuron to dendrites
 
         # create an matrix showing which dendrate each neuron's output is reached to
-        # self.dendrate = torch.zeros((self.n_neuron, self.n_neuron))
         self.dendrate = torch.randint(0, hidden_size, (self.n_neuron, self.n_neuron))
         self.dendrate[self.mask==0] = -1
 
@@ -337,14 +300,6 @@ class random_connect_network(nn.Module):
                 state_g_new[j,i], _, _ = self.neuron_list[i].forward_discrete(input_lists[j])
         return state_g_new.squeeze()
 
-    # def forward(self, state_g, n_step = 1, dt_train = 1):
-    #     # This forward function is specific for backprop training.
-    #     state_x = self.g_inverse(state_g,self.beta)
-    #     for _ in range(n_step):
-    #         pre_activation = state_g@self.weight.T+self.b
-    #         state_x = (dt_train/self.tau)*pre_activation + (1-dt_train/self.tau)*state_x
-    #         state_g = self.g(state_x, self.beta)
-    #     return state_g
     
     def train(self, patterns, lr=0.01, training_max_iter=1000, method='ALA'):
 
@@ -385,65 +340,50 @@ class random_connect_network(nn.Module):
         return input_list
 
 
-
-# def array_to_list(array, n_synapse_array):
-#     """Convert a 1D array to a list of 1D arrays, with the length of each array specified by n_synapse_array."""
-#     assert len(array) == torch.sum(n_synapse_array)
-#     list_of_arrays = []
-#     start = 0
-#     for i in range(len(n_synapse_array)):
-#         end = start + n_synapse_array[i]
-#         list_of_arrays.append(array[start:end])
-#         start = end
-#     return list_of_arrays
-
 # Example usage
 if __name__ == "__main__":
 
     torch.random.manual_seed(18)
     np.random.seed(0)
 
-    # # # Train the committee machine model
-    # input_size = 500
-    # hidden_size = 10
-    # batch_size = 1000
-    # pattern_act_mean = 0.25
-    # training_max_iter = 10000
-    # n_synapse_array = torch.zeros((hidden_size,)).to(torch.int32)
+    # # Train the committee machine model
+    input_size = 500
+    hidden_size = 10
+    batch_size = 1000
+    pattern_act_mean = 0.25
+    training_max_iter = 10000
+    n_synapse_array = torch.zeros((hidden_size,)).to(torch.int32)
 
-    # for i in range(hidden_size):
-    #     n_synapse_array[i] = input_size // hidden_size
-    # n_synapse_array[-1] = n_synapse_array[-1] + input_size - torch.sum(n_synapse_array) # make sure the total number of synapses is equal to the input size
-    
+    for i in range(hidden_size):
+        n_synapse_array[i] = input_size // hidden_size
+    n_synapse_array[-1] = n_synapse_array[-1] + input_size - torch.sum(n_synapse_array) # make sure the total number of synapses is equal to the input size
 
-    # # Create a random dataset
-    # labels = torch.sign(pattern_act_mean-torch.rand(batch_size))
-    # inputs = [[torch.sign(pattern_act_mean-torch.rand(n_synapse_array[i])) for i in range(hidden_size)] for _ in range(batch_size)]
+    # Create a random dataset
+    labels = torch.sign(pattern_act_mean-torch.rand(batch_size))
+    inputs = [[torch.sign(pattern_act_mean-torch.rand(n_synapse_array[i])) for i in range(hidden_size)] for _ in range(batch_size)]
+
+    # Initialize the model
+    model = committee_machine(input_size, hidden_size, n_synapse_array = n_synapse_array)
+    # train the model
+    train_log = model.train_backprop(inputs, labels, learning_rate=0.05, max_epochs=training_max_iter)
 
 
-    # # Initialize the model
-    # model = committee_machine(input_size, hidden_size, n_synapse_array = n_synapse_array)
-    # start_time = time.time()
-    # # train the model
-    # train_log = model.train_backprop(inputs, labels, learning_rate=0.05, max_epochs=training_max_iter)
-    # print('Training time = {}'.format(time.time()-start_time))
+    outputs = torch.zeros(batch_size)
+    for i in range(batch_size):
+        outputs[i], _, _ = model.forward_discrete(inputs[i])
+        input_tensor = model.pad_list_of_tensors(inputs[i]).unsqueeze(0)
+        output_continue = model.forward_tensor_version(input_tensor)
 
-    # outputs = torch.zeros(batch_size)
-    # for i in range(batch_size):
-    #     outputs[i], _, _ = model.forward_discrete(inputs[i])
-    #     input_tensor = model.pad_list_of_tensors(inputs[i]).unsqueeze(0)
-    #     output_continue = model.forward_tensor_version(input_tensor)
+    error_rate = torch.mean((outputs*labels<=0).float()).item()
+    print('Error rate = {}'.format(error_rate))
 
-    # error_rate = torch.mean((outputs*labels<=0).float()).item()
-    # print('Error rate = {}'.format(error_rate))
-
-    # plt.figure()
-    # plt.plot(train_log[2], train_log[1])
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Error rate')
-    # plt.show(block=True)
-    # plt.savefig('train_committee_machine.png')
-    # print('Training complete')
+    plt.figure()
+    plt.plot(train_log[2], train_log[1])
+    plt.xlabel('Epoch')
+    plt.ylabel('Error rate')
+    plt.show(block=True)
+    plt.savefig('train_committee_machine.png')
+    print('Training complete')
 
     # Train the random_connect_network_model:
     n_neuron = 100
@@ -459,13 +399,7 @@ if __name__ == "__main__":
     change_in_degree = True
     change_out_degree = False
 
-    # specify random seed
-    random.seed(0)
-    torch.manual_seed(1)
-
-
     # Train the random_connect_network_model:
-    
 
     neuron_act_prop = (torch.rand((n_neuron,))-0.5)*(pattern_act_std*np.sqrt(12)) + pattern_act_mean
     if change_in_degree:

@@ -1,17 +1,12 @@
 import numpy as np
 from numpy import random
 import torch
-from torch import nn
-from torch.nn import functional as F
 from matplotlib import pyplot as plt
-import scipy
 import scipy.stats as stats
 from random_connection_network import random_connect_network
-from numerical_random_network_parallel import calculate_numerical_cacpacity
+from numerical_random_network_cm_parallel import calculate_numerical_capacity
 import utils_basic as utils
 import utils_numerical as utils_num
-import copy
-import pickle
 import warnings
 import matplotlib
 import argparse
@@ -69,8 +64,8 @@ def scatter_plot_color(x, y, z, x_label, y_label, z_label, title, ax=None, squar
 
 if __name__ == '__main__':
 
-    sys.argv += "--n_neuron 500 --n_repeat 10 --pattern_act_mean 0.25  --ratio_conn_mean 0.5 --change_in_degree\
-        --heter_type both_uncorr --ratio_conn_std 0.10 --pattern_act_std 0.10 --seed 15".split()
+    # sys.argv += "--n_neuron 100 --n_repeat 10 --pattern_act_mean 0.25  --ratio_conn_mean 0.5 --change_in_degree\
+    #     --heter_type both_uncorr --ratio_conn_std 0.10 --pattern_act_std 0.10 --seed 15".split()
 
     parser = argparse.ArgumentParser(description="Memorize correlated concepts with one layer network")
     parser.add_argument('--method', type=str, default='svm', help='training method', choices=['PLA', 'svm'])
@@ -97,7 +92,11 @@ if __name__ == '__main__':
 
     pars = vars(args)
 
-    pars['W_notsymmetric'] = not pars['W_symmetric']
+    # Not using the committee machine network just the regular one.
+    pars['use_committee_machine'] = False
+    pars["n_dentrates"] = 1
+    pars["lr_committee"]=0.05
+    pars["add_bias"]=True
 
     method = pars['method']
     n_neuron = pars['n_neuron']
@@ -176,7 +175,7 @@ if __name__ == '__main__':
         network = random_connect_network(n_neuron, W_symmetric=W_symmetric,connection_prop=None, weight_std_init=weight_std_init, mask=mask, neuron_base_state=neuron_base_state)
 
         # find the capacity of network:
-        cap = calculate_numerical_cacpacity(pars, n_neuron*7, 2, epsilon=epsilon, neuron_act_prop=neuron_act_prop, network=network)
+        cap = calculate_numerical_capacity(pars, n_neuron*7, 2, epsilon=epsilon, neuron_act_prop=neuron_act_prop, network=network)
         print("numerical capacity: ", cap)
 
         network.reinitiate()
@@ -201,7 +200,6 @@ if __name__ == '__main__':
 
         plt.sca(axes[0,plot_index[i]])
         scatter_plot_color(empirical_coding_level, ratio_individual_input, in_degree, "Neural coding level", "Percentage of positive input", "In-degree", f"{label_set[i]}", ax=axes[0,plot_index[i]], square=False, vmax=vmax, vmin=vmin)
-        # plt.scatter(empirical_coding_level, ratio_individual_input, label=label_set[i],alpha=0.5, s=8)
         # use least square to fit the line:
         slope, intercept, r_value, p_value, std_err = stats.linregress(empirical_coding_level.numpy(), ratio_individual_input.numpy())
         plt.plot(empirical_coding_level, slope*empirical_coding_level + intercept, color= color_set[i])
@@ -214,7 +212,6 @@ if __name__ == '__main__':
         
         plt.sca(axes[1,plot_index[i]])
         scatter_plot_color(empirical_coding_level, mean_total_input, in_degree, "Neural coding level", "Mean of the total input", "In-degree", "", ax=axes[1,plot_index[i]], square=False, vmax=vmax, vmin=vmin)
-        # plt.scatter(empirical_coding_level, mean_total_input, label=label_set[i], color=color_set[i], alpha=0.5, s=8)
         # use least square to fit the line:
         slope, intercept, r_value, p_value, std_err = stats.linregress(empirical_coding_level.numpy(), mean_total_input.numpy())
         plt.plot(empirical_coding_level, slope*empirical_coding_level + intercept, color= color_set[i])
@@ -226,7 +223,6 @@ if __name__ == '__main__':
 
         plt.sca(axes[2,plot_index[i]])
         scatter_plot_color(empirical_coding_level, threshold, in_degree, "Neural coding level", "Activation Threshold", "In-degree", "", ax=axes[2,plot_index[i]], square=False, vmax=vmax, vmin=vmin)
-        # plt.scatter(empirical_coding_level, threshold, label=label_set[i], color=color_set[i], alpha=0.5, s=8)
         # use least square to fit the line:
         slope, intercept, r_value, p_value, std_err = stats.linregress(empirical_coding_level.numpy(), threshold)
         plt.plot(empirical_coding_level, slope*empirical_coding_level + intercept, color= color_set[i])
@@ -237,13 +233,6 @@ if __name__ == '__main__':
         plt.xlim(0.5,1)
 
 
-        # plt.sca(axes[1,0])
-        # plt.scatter(empirical_coding_level, mean_sign, label=label_set[i], color=color_set[i], alpha=0.5)
-        # # use least square to fit the line:
-        # slope, intercept = np.polyfit(empirical_coding_level.numpy(), mean_sign.numpy(), 1)
-        # plt.plot(empirical_coding_level, slope*empirical_coding_level + intercept, color= color_set[i])
-        # plt.xlabel("Neural coding level")
-        # plt.ylabel("Mean of the activity of neurons (control analysis)")
         threshold_set = np.append(threshold_set, threshold)
         ratio_individual_input_set = np.append(ratio_individual_input_set, ratio_individual_input)
         coding_level_set = np.append(coding_level_set, empirical_coding_level)

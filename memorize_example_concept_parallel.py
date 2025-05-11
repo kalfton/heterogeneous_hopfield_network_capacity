@@ -1,21 +1,16 @@
 import numpy as np
 from numpy import random
 import torch
-from torch import nn
-from torch.nn import functional as F
 from matplotlib import pyplot as plt
-import scipy
 from random_connection_network import random_connect_network
 import utils_basic as utils
-import utils_numerical as utils_num
 import copy
 import pickle
 import warnings
-import matplotlib
 import argparse
 import sys
 import time
-# matplotlib.use('TkAgg')
+from plot_memorize_example_concept import plot_example_correlated_concepts
 
 import multiprocessing as mp
 
@@ -67,8 +62,8 @@ def calculate_errors(n_concept, n_example_per_concept, mask, neuron_act_prop, pa
 
 if __name__ == '__main__':
 
-    sys.argv += "--n_neuron 100 --n_repeat 10 --reinit_prop 0.3 --pattern_act_mean 0.25  --ratio_conn_mean 0.5 --change_in_degree\
-        --heter_type both_positive_corr --n_process 8".split()
+    # sys.argv += "--n_neuron 100 --n_repeat 2 --reinit_prop 0.3 --pattern_act_mean 0.25  --ratio_conn_mean 0.5 --change_in_degree\
+    #     --heter_type both_positive_corr --n_process 8".split()
 
     parser = argparse.ArgumentParser(description="Memorize correlated concepts with one layer network")
     parser.add_argument('--n_neuron', type=int, default=50, help='number of neurons')
@@ -86,7 +81,6 @@ if __name__ == '__main__':
     parser.add_argument('--change_in_degree', action='store_true', help='change the in degree of the neurons')
     parser.add_argument('--change_out_degree', action='store_true', help='change the out degree of the neurons')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
-    # parser.add_argument('--use_coding_level_heter', action='store_true', help='whether to use heterogeneous coding level, default is heterogeneous network topology')
     parser.add_argument('--heter_type', type=str, default='ratio_conn_std', choices=['coding_level', 'network_connection', 'both_positive_corr', 'both_negative_corr', 'both_uncorr'], help='heterogeneity type')
     parser.add_argument('--n_process', type=int, default=16, help='number of processes for parallelization')
     args = parser.parse_args()
@@ -104,7 +98,6 @@ if __name__ == '__main__':
     neuron_base_state = pars['neuron_base_state']
     W_symmetric = pars['W_symmetric']
     reinit_prop = pars['reinit_prop']
-
     pattern_act_mean = pars['pattern_act_mean']
     pattern_act_std = pars['pattern_act_std']
     ratio_conn_mean = pars['ratio_conn_mean']
@@ -125,15 +118,6 @@ if __name__ == '__main__':
     n_heter_level = 3
     network_heter_level_set = np.linspace(0.0, 0.18, n_heter_level)
     coding_level_heter_set = np.linspace(0.0, 0.14, n_heter_level)
-
-    # if use_coding_level_heter:
-    #     heter_level_set = coding_level_heter_set
-    # else:
-    #     heter_level_set = network_heter_level_set
-
-    # step =5
-    # n_concept_set = np.arange(1, n_neuron*2, step)
-    # n_example_per_concept_set = np.arange(1, n_neuron, step)
     
 
     concept_errors = np.zeros((len(n_concept_set), len(n_example_per_concept_set), n_heter_level, n_repeat))
@@ -200,11 +184,6 @@ if __name__ == '__main__':
                     for k in range(n_repeat):
                         pool_results_object[i][j][m][k] = pool.apply_async(calculate_errors, args=(n_concept, n_pattern_per_concept, mask, neuron_act_prop, pars)) 
                         print("n_concept: ", n_concept, "n_example_per_concept: ", n_pattern_per_concept, "network heterogeneity: ", ratio_conn_std, "repeat: ", k)
-                        # for debugging: 
-                        # error_concept, error_example = calculate_errors(n_concept, n_pattern_per_concept, mask, neuron_act_prop, pars)
-                        # concept_errors[i,j,m,k] = error_concept
-                        # concept_errors[i,j,m,k] = error_concept
-                        # print("n_concept: ", n_concept, "n_example_per_concept: ", n_pattern_per_concept, "network heterogeneity: ", ratio_conn_std, "repeat: ", k, "concept error: ", error_concept, "example error: ", error_example)
                         
         # fetch the parallel results
         for m in range(n_heter_level):
@@ -243,6 +222,10 @@ if __name__ == '__main__':
 
     with open('results/training_error_concept_and_example_3D_matrix'+utils.make_name_with_time()+'.pkl', 'wb') as f:
         pickle.dump(results, f)
+
+    # plot the results:
+    plot_example_correlated_concepts(results)
+
 
 
 

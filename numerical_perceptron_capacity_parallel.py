@@ -1,25 +1,12 @@
 import numpy as np
-from numpy import random
 import torch
-from torch import nn
-from torch.nn import functional as F
 from matplotlib import pyplot as plt
-import scipy
-from scipy.linalg import sqrtm
-from torch import optim
-from torch.optim.lr_scheduler import ExponentialLR
 import utils_basic as utils
 import utils_theoretical
-import math
-from sklearn import svm
-from scipy.integrate import quad
-from scipy.optimize import root
 import time
 import argparse
 import multiprocessing as mp
 import sys
-
-# TODO: Make the for loop parallel
 
 # create data points for svm
 def create_data_normal(n_data, n_neuron, ratio_label = 0.5, mean=1.0, var=1, correlation = 0.0):
@@ -49,22 +36,17 @@ def create_data_gaussian_markov_chain(n_data, n_neuron, ratio_label = 0.5, phi=0
     
     # Initialize output array
     sequences = np.zeros((n_data, n_neuron))
-
     one_minus_phi = np.sqrt(1 - phi**2)
     
     for sample_idx in range(n_data):
         # Starting value
         x_i = np.random.normal(0, sigma)
-        
         for seq_idx in range(n_neuron):
             # Gaussian noise
             epsilon_i = np.random.normal(0, sigma)
-            
             # Markov chain formula
             x_i = phi * x_i + one_minus_phi*epsilon_i
-            
             sequences[sample_idx, seq_idx] = x_i
-
     sequences = sequences+bias
 
     y = np.random.rand(n_data)
@@ -152,16 +134,11 @@ def binary_search_capacity(n_neuron, max_n_data, method, ratio_label = 0.5, add_
         if np.unique(label).shape[0] == 1:
             left = mid + step
         else:
-            # svm by sklearn
-            # clf = svm.LinearSVC(C=1, fit_intercept=add_bias)
-            # score = clf.score(x_data, label)
-
             # manual svm:
             regularization = np.var(x_data,axis=0)
             varmin = np.var(x_data)*0.1
             regularization[regularization<varmin] = varmin # prevent the regularization to be too small, which may cause numerical instability
             W, b = utils.svm_by_sklearn(x_data, label, regularization=regularization, add_bias=add_bias)
-            # W, b = utils.svm_learning_alg(x_data, label, C = 100)
             score = utils.svm_score(W, b, x_data, label, kappa = kappa, regularization = regularization)
 
             if score>1-epsilon:
@@ -177,7 +154,7 @@ def capacity_for_parallel(par1, par2, syspars, step, method="binary"):
     n_repeat = syspars["n_repeat"]
     add_bias =  syspars["add_bias"]
     kappa = syspars["kappa"]
-    use_reg = syspars["use_kappa"]
+    use_reg = syspars["use_reg"]
 
     capacity = np.zeros(n_repeat)
     for k in range(n_repeat):
@@ -196,11 +173,6 @@ def capacity_for_parallel(par1, par2, syspars, step, method="binary"):
             if np.unique(label).shape[0] == 1:
                 left = mid + step
             else:
-                # svm by sklearn
-                # clf = svm.LinearSVC(C=1, fit_intercept=add_bias)
-                # clf.fit(x_data, label)
-                # score = clf.score(x_data, label)
-
                 # manual svm:
                 if use_reg:
                     regularization = np.var(x_data, axis=0)
@@ -209,10 +181,7 @@ def capacity_for_parallel(par1, par2, syspars, step, method="binary"):
                 else:
                     regularization = np.ones(n_neuron)
 
-                # regularization = np.var(x_data,axis=0)
-                # regularization[regularization<1e-5] = 1e-5 # avoid numerical instability
                 W, b = utils.svm_by_sklearn(x_data, label, regularization=regularization, add_bias=add_bias)
-                # W, b = utils.svm_learning_alg(x_data, label, C = 100)
                 score = utils.svm_score(W, b, x_data, label, kappa = kappa)
 
                 if score>1-epsilon:
@@ -234,7 +203,7 @@ if __name__ == '__main__':
     parser.add_argument('--add_bias', action='store_true', help='add bias term or not')
     parser.add_argument('--epsilon', type=float, default=1e-2, help='accuracy of the capacity')
     parser.add_argument('--kappa', type=float, default=0.5, help='kappa value for the perceptron')
-    parser.add_argument('--use_kappa', action='store_true', help='use kappa or not')
+    parser.add_argument('--use_reg', action='store_true', help='use kappa or not')
     parser.add_argument('--n_process', type=int, default=10, help='number of processes to run in parallel')
 
     pars = vars(parser.parse_args())
@@ -243,13 +212,12 @@ if __name__ == '__main__':
     n_neuron = pars["n_neuron"]
     n_repeat = pars["n_repeat"]
     add_bias =  pars["add_bias"]
-    if not pars["use_kappa"]:
+    if not pars["use_reg"]:
         pars["kappa"]=0.0
     kappa = pars["kappa"]
     n_process = np.min((pars["n_process"], mp.cpu_count()))
 
     # Binary distribution
-    # create data points for svm
     # input_mean_set = -1+2*np.concatenate((np.arange(0.01,0.09, 0.03), np.arange(0.1, 0.9, 0.1), np.arange(0.9, 0.999, 0.03)))
     # output_mean_set = -1+2*np.concatenate((np.arange(0.01,0.09, 0.03), np.arange(0.1, 0.9, 0.1), np.arange(0.9, 0.999, 0.03)))
     input_mean_set = -1+2*np.arange(0.01,0.9999, 0.02)
@@ -273,8 +241,6 @@ if __name__ == '__main__':
                 ratio_label = (output_mean_set[j]+1)/2
                 pool_results_object[i][j] = pool.apply_async(capacity_for_parallel, args=(ratio_active, ratio_label, pars, step, "binary"))
                 print("ratio_active: ", ratio_active, "ratio_label: ", ratio_label)
-                # for debug:
-                # capacities[i][j] = capacity_for_parallel(ratio_active, ratio_label, pars, step, "binary")
 
         # get the results
         for i in range(len(input_mean_set)):
@@ -320,8 +286,6 @@ if __name__ == '__main__':
                 ratio_label = (output_mean_set[j]+1)/2
                 pool_results_object[i][j] = pool.apply_async(capacity_for_parallel, args=(input_corr, ratio_label, pars, step, "markov"))
                 print("input_corr: ", input_corr, "ratio_label: ", ratio_label)
-                # for debug:
-                # capacities[i][j] = capacity_for_parallel(input_corr, ratio_label, pars, step, "markov")
 
         # get the results
         for i in range(len(input_corr_set)):
@@ -467,7 +431,6 @@ if __name__ == '__main__':
     plt.ylim(0, 7.5)
     plt.legend()
     plt.show(block=False)
-    # plt.savefig("results/comparison_of_capacity_with_different_distributions_n=100.png")
     plt.savefig("results/comparison_of_capacity_with_different_distributions_n="+str(n_neuron) +"k =" + str(kappa) +utils.make_name_with_time()+".pdf")
 
 
