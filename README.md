@@ -5,7 +5,13 @@ This repository contains the code used in our paper on the memory capacity of he
 
 ## How to Run the Analyses
 
-To run the analyses, execute the following command in a Bash shell terminal:
+To run the analyses, firstly install the conda environment:
+
+```bash
+conda env create --file environment.yml
+````
+
+Then execute the following command in a Bash shell terminal with the conda environment activated:
 
 ```bash
 ./Run_analyses.sh
