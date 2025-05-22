@@ -1,5 +1,5 @@
 
-# network_capacity
+# Heterogeneous Network Capacity
 
 This repository contains the code used in our paper on the memory capacity of heterogeneous Hopfield networks.
 
