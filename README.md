@@ -1,7 +1,9 @@
 
 # Heterogeneous Network Capacity
 
-This repository contains the code used in our paper on the memory capacity of heterogeneous Hopfield networks.
+This repository contains the code for the paper: 
+
+Zhang K, Tavoni G. Maximizing memory capacity in heterogeneous networks. PRX Life. 2025.
 
 ## How to Run the Analyses
 
