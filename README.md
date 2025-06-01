@@ -1,9 +1,7 @@
 
 # Heterogeneous Network Capacity
 
-This repository contains the code for the paper: 
-
-Zhang K, Tavoni G. Maximizing memory capacity in heterogeneous networks. PRX Life. 2025.
+This repository contains the code for the paper: Zhang K, Tavoni G. Maximizing memory capacity in heterogeneous networks. PRX Life. 2025.
 
 ## How to Run the Analyses
 
